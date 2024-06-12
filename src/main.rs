@@ -1,26 +1,15 @@
-extern crate gtk;
-use gtk::prelude::*;
-use gtk::{Button, Window, WindowType};
+slint::include_modules!();
 
-fn main() {
-    gtk::init().expect("Failed to initialize GTK.");
+fn main() -> Result<(), slint::PlatformError> {
+    let ui = AppWindow::new()?;
 
-    let window = Window::new(WindowType::Toplevel);
-    window.set_title("Hello, GTK+");
-    window.set_default_size(350, 70);
-
-    let button = Button::with_label("Click me!");
-    button.connect_clicked(|_| {
-        println!("Button clicked!");
+    ui.on_request_increase_value({
+        let ui_handle = ui.as_weak();
+        move || {
+            let ui = ui_handle.unwrap();
+            ui.set_counter(ui.get_counter() + 1);
+        }
     });
 
-    window.add(&button);
-    window.show_all();
-
-    window.connect_delete_event(|_, _| {
-        gtk::main_quit();
-        Inhibit(false)
-    });
-
-    gtk::main();
+    ui.run()
 }
