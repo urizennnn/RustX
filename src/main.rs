@@ -1,7 +1,10 @@
+use ashpd::desktop::account::UserInformation;
+use ashpd::WindowIdentifier;
+use glib::clone;
 use gtk::prelude::*;
-use gtk::{glib, Align, Application, ApplicationWindow, Box, Orientation, Switch};
+use gtk::{glib, Application, ApplicationWindow, Button};
 
-const APP_ID: &str = "org.gtk_rs.GObjectProperties1";
+const APP_ID: &str = "org.gtk_rs.MainEventLoop7";
 
 fn main() -> glib::ExitCode {
     // Create a new application
@@ -15,52 +18,44 @@ fn main() -> glib::ExitCode {
 }
 
 fn build_ui(app: &Application) {
-    // Create the switch
-    let switch = Switch::new();
-    let switch2 = Switch::new();
-    // Set and then immediately obtain active property
-    switch.set_active(true);
-    switch2.set_active(true);
-    switch.connect_activate(|switch| {
-        switch.set_active(false);
-        let switch_active = switch.is_active();
-        println!("The active property of switch is {}", switch_active);
-    });
-    let switch_active = switch.is_active();
-    switch
-        .bind_property("active", &switch2, "active")
-        .transform_to(|_, active: bool| {
-            print!("The active property of switch is {}", active);
-            Some(!active)
-        })
-        .transform_to(|_, active: bool| Some(active))
-        .sync_create()
-        .build();
-
-    // This prints: "The active property of switch is true"
-    println!("The active property of switch is {}", switch_active);
-
-    // Set up box
-    let gtk_box = Box::builder()
+    // Create a button
+    let button = Button::builder()
+        .label("Press me!")
         .margin_top(12)
         .margin_bottom(12)
         .margin_start(12)
         .margin_end(12)
-        .valign(Align::Center)
-        .halign(Align::Center)
-        .spacing(12)
-        .orientation(Orientation::Vertical)
         .build();
-    gtk_box.append(&switch);
-    gtk_box.append(&switch2);
+
+    // Connect to "clicked" signal of `button`
+    button.connect_clicked(move |button| {
+        // The main loop executes the asynchronous block
+        glib::spawn_future_local(clone!(@weak button => async move {
+            // Get native of button for window identifier
+            let native = button.native().expect("Need to be able to get native.");
+            // Get window identifier so that the dialog will be modal to the main window
+            let identifier = WindowIdentifier::from_native(&native).await;
+            let request = UserInformation::request()
+                .reason("App would like to access user information.")
+                .identifier(identifier)
+                .send()
+                .await;
+
+            if let Ok(response) = request.and_then(|r| r.response()) {
+                println!("User name: {}", response.name());
+            } else {
+                println!("Could not access user information.")
+            }
+        }));
+    });
 
     // Create a window
     let window = ApplicationWindow::builder()
         .application(app)
         .title("My GTK App")
-        .child(&gtk_box)
+        .child(&button)
         .build();
 
-    // Present the window
+    // Present window
     window.present();
 }
